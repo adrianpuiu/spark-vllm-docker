@@ -202,8 +202,13 @@ RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
 RUN curl -L https://patch-diff.githubusercontent.com/raw/vllm-project/vllm/pull/34758.diff | patch -p1 -R || echo "Cannot revert PR #34758, skipping"
 RUN curl -L https://patch-diff.githubusercontent.com/raw/vllm-project/vllm/pull/34302.diff | patch -p1 -R || echo "Cannot revert PR #34302, skipping"
 # TEMPORARY PATCH for broken NVFP4 quants
-RUN curl -sSL https://patch-diff.githubusercontent.com/raw/vllm-project/vllm/pull/38126.diff -o pr38126.diff \
-    && (git apply --reverse --check pr38126.diff || git apply pr38126.diff) \
+RUN curl -fsL https://patch-diff.githubusercontent.com/raw/vllm-project/vllm/pull/38126.diff -o pr38126.diff \
+    && if git apply --reverse --check pr38126.diff 2>/dev/null; then \
+         echo "Patch already applied, skipping."; \
+       else \
+         echo "Applying patch..."; \
+         git apply -v pr38126.diff; \
+       fi \
     && rm pr38126.diff
 
 # Final Compilation
