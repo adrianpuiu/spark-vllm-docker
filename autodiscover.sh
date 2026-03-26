@@ -1,5 +1,52 @@
 #!/bin/bash
 
+# Load .env file if exists (for shared configuration)
+# This is called early so that DOTENV_* variables are available to all functions
+load_env_if_exists() {
+    local env_file="${CONFIG_FILE:-}"
+    local config_explicit="${CONFIG_FILE_SET:-false}"
+    
+    # If CONFIG_FILE is not set, check default location
+    if [[ -z "$env_file" ]]; then
+        local script_dir="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
+        env_file="$script_dir/.env"
+        config_explicit="false"
+    fi
+    
+    # Validate config file exists if explicitly specified
+    if [[ "$config_explicit" == "true" ]] && [[ ! -f "$env_file" ]]; then
+        echo "Error: Config file not found: $env_file"
+        exit 1
+    fi
+    
+    if [[ -f "$env_file" ]]; then
+        # Load .env variables with DOTENV_ prefix
+        while IFS='=' read -r key value || [[ -n "$key" ]]; do
+            # Skip comments and empty lines
+            [[ "$key" =~ ^[[:space:]]*# ]] && continue
+            [[ -z "$key" ]] && continue
+            
+            # Remove leading/trailing whitespace from key
+            key=$(echo "$key" | xargs)
+            
+            # Skip if key is empty after trimming
+            [[ -z "$key" ]] && continue
+            
+            # Remove quotes from value
+            value="${value%\"}"
+            value="${value#\"}"
+            value="${value%\'}"
+            value="${value#\'}"
+            
+            # Export with DOTENV_ prefix
+            export "DOTENV_$key=$value"
+        done < "$env_file"
+    fi
+}
+
+# Load .env file
+load_env_if_exists
+
 # Function to detect IB and Ethernet interfaces
 detect_interfaces() {
     # If both interfaces are already set, nothing to do
@@ -108,6 +155,19 @@ detect_nodes() {
                 PEER_NODES+=("$node")
             fi
         done
+        return 0
+    fi
+    
+    # Try to use COPY_HOSTS from .env
+    if [[ -n "$DOTENV_COPY_HOSTS" ]]; then
+        echo "  Using COPY_HOSTS from .env: $DOTENV_COPY_HOSTS"
+        PEER_NODES=()
+        IFS=',' read -ra ALL_NODES <<< "$DOTENV_COPY_HOSTS"
+        for node in "${ALL_NODES[@]}"; do
+            node=$(echo "$node" | xargs)
+            PEER_NODES+=("$node")
+        done
+        NODES_ARG="$DOTENV_COPY_HOSTS"
         return 0
     fi
 

@@ -28,6 +28,7 @@ VLLM_RELEASE_TAG="prebuilt-vllm-current"
 # Space-separated list of GPU architectures for which prebuilt wheels are available
 PREBUILT_WHEELS_SUPPORTED_ARCHS="12.1a"
 CLEANUP_MODE="false"
+CONFIG_FILE=""
 
 cleanup() {
     if [ -n "$TMP_IMAGE" ] && [ -f "$TMP_IMAGE" ]; then
@@ -280,11 +281,13 @@ usage() {
     echo "  --no-build                    : Skip building, only copy image (requires --copy-to)"
     echo "  --network <network>           : Docker network to use during build"
     echo "  --cleanup                     : Remove all *.whl and *.-commit files in wheels directory"
+    echo "  --config                      : Path to .env configuration file (default: .env in script directory)"
     echo "  -h, --help                    : Show this help message"
     exit 1
 }
 
-# Argument parsing
+# Parse all arguments
+CONFIG_FILE_SET=false
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         -t|--tag) IMAGE_TAG="$2"; shift ;;
@@ -298,27 +301,6 @@ while [[ "$#" -gt 0 ]]; do
                 add_copy_hosts "$1"
                 shift
             done
-
-            if [ "${#COPY_HOSTS[@]}" -eq 0 ]; then
-                echo "No hosts specified. Using autodiscovery..."
-                source "$(dirname "$0")/autodiscover.sh"
-
-                detect_nodes
-                if [ $? -ne 0 ]; then
-                    echo "Error: Autodiscovery failed."
-                    exit 1
-                fi
-
-                if [ ${#PEER_NODES[@]} -gt 0 ]; then
-                    COPY_HOSTS=("${PEER_NODES[@]}")
-                fi
-
-                if [ "${#COPY_HOSTS[@]}" -eq 0 ]; then
-                     echo "Error: Autodiscovery found no other nodes."
-                     exit 1
-                fi
-                echo "Autodiscovered hosts: ${COPY_HOSTS[*]}"
-            fi
             continue
             ;;
         -j|--build-jobs) BUILD_JOBS="$2"; shift ;;
@@ -351,11 +333,41 @@ while [[ "$#" -gt 0 ]]; do
                 exit 1
             fi
             ;;
+        --config) CONFIG_FILE="$2"; CONFIG_FILE_SET=true; shift ;;
         -h|--help) usage ;;
         *) echo "Unknown parameter passed: $1"; usage ;;
     esac
     shift
 done
+
+# Source autodiscover.sh to load .env file
+source "$(dirname "$0")/autodiscover.sh"
+
+# Handle COPY_HOSTS from .env or autodiscovery if not specified via arguments
+if [ "${#COPY_HOSTS[@]}" -eq 0 ]; then
+    if [[ -n "$DOTENV_COPY_HOSTS" ]]; then
+        echo "Using COPY_HOSTS from .env: $DOTENV_COPY_HOSTS"
+        IFS=',' read -ra HOSTS_FROM_ENV <<< "$DOTENV_COPY_HOSTS"
+        COPY_HOSTS=("${HOSTS_FROM_ENV[@]}")
+    else
+        echo "No hosts specified. Using autodiscovery..."
+        detect_nodes
+        if [ $? -ne 0 ]; then
+            echo "Error: Autodiscovery failed."
+            exit 1
+        fi
+
+        if [ ${#PEER_NODES[@]} -gt 0 ]; then
+            COPY_HOSTS=("${PEER_NODES[@]}")
+        fi
+
+        if [ "${#COPY_HOSTS[@]}" -eq 0 ]; then
+              echo "Error: Autodiscovery found no other nodes."
+              exit 1
+        fi
+        echo "Autodiscovered hosts: ${COPY_HOSTS[*]}"
+    fi
+fi
 
 # Validate flag combinations
 if [ -n "$VLLM_PRS" ]; then
