@@ -123,7 +123,7 @@ RUN if [ -n "$FLASHINFER_PRS" ]; then \
     fi
 
 # TEMPORARY patch for NVFP4 crash (PR 2913)
-RUN curl -fsL https://github.com/flashinfer-ai/flashinfer/pull/38423.diff -o pr2913.diff \
+RUN curl -fsL https://github.com/flashinfer-ai/flashinfer/pull/2913.diff -o pr2913.diff \
     && if git apply --reverse --check pr2913.diff 2>/dev/null; then \
          echo "PR #2913 already applied, skipping."; \
        else \
