@@ -1260,10 +1260,19 @@ Examples:
 
         # Add mods
         for mod in recipe.get("mods", []):
-            mod_path = SCRIPT_DIR / "mods" / mod
+            # Check if mod already includes mods/ prefix
+            if mod.startswith("mods/"):
+                mod_path = SCRIPT_DIR / mod
+            else:
+                # For backward compatibility, try both with and without mods/ prefix
+                mod_path = SCRIPT_DIR / mod
+                if not mod_path.exists():
+                    mod_path = SCRIPT_DIR / "mods" / mod
+
             if not mod_path.exists():
                 print(f"Warning: Mod path not found: {mod_path}")
-            cmd.extend(["--apply-mod", str(mod_path)])
+            else:
+                cmd.extend(["--apply-mod", str(mod_path)])
 
         # Add launch options
         if args.solo:
