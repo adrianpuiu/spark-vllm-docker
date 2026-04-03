@@ -7,17 +7,20 @@ recipe_version: "1"
 name: Gemma4-26B-A4B-NVFP4A16
 description: vLLM serving Gemma4-26B-A4B with NVFP4 weight-only quantization (W4A16)
 
+# HuggingFace model to download (optional, for --download-model)
 model: bg-digitalservices/Gemma-4-26B-A4B-it-NVFP4A16
-container: vllm-node-tf5
-cluster_only: false
+
+# Container image to use
+container: vllm-node
+
+# Can run in solo mode only
 solo_only: true
 
+# Mods required for NVFP4 MoE support
 mods:
-  - fix-gemma4-nvfp4-moe
+  - mods/fix-gemma4-nvfp4-moe
 
-env:
-  VLLM_NVFP4_GEMM_BACKEND: marlin
-
+# Default settings (can be overridden via CLI)
 defaults:
   port: 8000
   host: 0.0.0.0
@@ -25,6 +28,11 @@ defaults:
   max_model_len: 262144
   max_num_seqs: 4
 
+# Environment variables
+env:
+  VLLM_NVFP4_GEMM_BACKEND: marlin
+
+# The vLLM serve command template
 command: |
   vllm serve bg-digitalservices/Gemma-4-26B-A4B-it-NVFP4A16 \
     --served-model-name gemma-4 \
